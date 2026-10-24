@@ -1,0 +1,204 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Rank {
+  NONE
+  ONE_STAR
+  TWO_STAR
+  THREE_STAR
+}
+
+enum IncomeType {
+  DIRECT_20
+  MATRIX_40
+  LEVEL_10
+  CAPITAL_GAIN_20
+  RANK_10
+  MAGICAL
+}
+
+enum TxType {
+  WITHDRAWAL
+  P2P_TRANSFER
+  PACKAGE_UPGRADE
+  CAPITAL_GAIN_JOIN
+}
+
+enum TxStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+}
+
+// --------------------------------------------------------------------------
+// 1. User & Sponsor Hierarchy
+// --------------------------------------------------------------------------
+model User {
+  id                    Int          @id @default(autoincrement())
+  walletAddress         String       @unique
+  sponsorId             Int?
+  sponsor               User?        @relation("SponsorshipTree", fields: [sponsorId], references: [id])
+  directReferrals       User[]       @relation("SponsorshipTree")
+
+  currentPackage        Int          @default(0) // $10, $20, $40, $80, $160, $320, $640, $1280
+  rank                  Rank         @default(NONE)
+
+  // 500% Capping Rules
+  cappingLimit          Decimal      @default(0.00) @db.Decimal(18, 4) // currentPackage * 5
+  cappingEarned         Decimal      @default(0.00) @db.Decimal(18, 4) // tracked until 500% cap
+
+  // Total Lifetime Earnings Breakdown
+  totalEarned           Decimal      @default(0.00) @db.Decimal(18, 4)
+  totalDirectEarned     Decimal      @default(0.00) @db.Decimal(18, 4)
+  totalMatrixEarned     Decimal      @default(0.00) @db.Decimal(18, 4)
+  totalLevelEarned      Decimal      @default(0.00) @db.Decimal(18, 4)
+  totalCapitalEarned    Decimal      @default(0.00) @db.Decimal(18, 4)
+  totalRankEarned       Decimal      @default(0.00) @db.Decimal(18, 4)
+  totalMagicalEarned    Decimal      @default(0.00) @db.Decimal(18, 4)
+
+  // Fast Cached Metrics
+  directsCount          Int          @default(0)
+  teamSize              Int          @default(0)
+  isActive              Boolean      @default(true)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  // Relations
+  packages              PackageActivation[]
+  matrixPositions       MatrixPosition[]
+  earningsReceived      EarningLog[]         @relation("ReceivedEarnings")
+  earningsGenerated     EarningLog[]         @relation("GeneratedEarnings")
+  capitalGainPlans      CapitalGainSubscription[]
+  transactions          Transaction[]
+
+  @@index([walletAddress])
+  @@index([sponsorId])
+}
+
+// --------------------------------------------------------------------------
+// 2. Package Activations ($10, $20, $40, $80, $160, $320, $640, $1280)
+// --------------------------------------------------------------------------
+model PackageActivation {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id])
+  packageAmount Int      // 10, 20, 40, 80, etc.
+  txHash        String   @unique
+  blockNumber   BigInt?
+  createdAt     DateTime @default(now())
+
+  @@index([userId, packageAmount])
+}
+
+// --------------------------------------------------------------------------
+// 3. 40% Global Matrix Positions & 2-Slot Recycling
+// --------------------------------------------------------------------------
+model MatrixPosition {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id])
+  packageAmount   Int      // $10, $20, $40, $80...
+  cycleNumber     Int      @default(1)
+  
+  // Slot 1: Re-entry ($4 on $10)
+  slot1Filled     Boolean  @default(false)
+  slot1UserId     Int?
+  slot1FilledAt   DateTime?
+
+  // Slot 2: Instant Withdrawal ($4 on $10)
+  slot2Filled     Boolean  @default(false)
+  slot2UserId     Int?
+  slot2FilledAt   DateTime?
+
+  isCompleted     Boolean  @default(false)
+  reEntryCount    Int      @default(0)
+  totalEarned     Decimal  @default(0.00) @db.Decimal(18, 4)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, packageAmount, isCompleted])
+}
+
+// --------------------------------------------------------------------------
+// 4. 10-Level Lineage & Genealogy Tree (1% per level x 10)
+// --------------------------------------------------------------------------
+model LevelTree {
+  id           Int      @id @default(autoincrement())
+  ancestorId   Int      // Upline
+  descendantId Int      // Downline member
+  depth        Int      // 1 to 10
+  createdAt    DateTime @default(now())
+
+  @@unique([ancestorId, descendantId])
+  @@index([ancestorId, depth])
+  @@index([descendantId])
+}
+
+// --------------------------------------------------------------------------
+// 5. 20% Capital Gain Passive Plan ($150 -> $300, $4 every 10 days)
+// --------------------------------------------------------------------------
+model CapitalGainSubscription {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  user              User     @relation(fields: [userId], references: [id])
+  packageAmount     Decimal  @default(150.00) @db.Decimal(10, 2)
+  payoutPerCycle    Decimal  @default(4.00)   @db.Decimal(10, 2)
+  totalReturnTarget Decimal  @default(300.00) @db.Decimal(10, 2)
+  totalPaid         Decimal  @default(0.00)   @db.Decimal(10, 2)
+  cyclesCompleted   Int      @default(0)      // Max 75 cycles (75 * $4 = $300)
+  maxCycles         Int      @default(75)
+  lastPayoutAt      DateTime?
+  nextPayoutAt      DateTime
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  @@index([userId, isActive])
+  @@index([nextPayoutAt, isActive])
+}
+
+// --------------------------------------------------------------------------
+// 6. 100% Distribution Earnings Audit Logs
+// --------------------------------------------------------------------------
+model EarningLog {
+  id            Int         @id @default(autoincrement())
+  userId        Int         // Recipient of commission
+  user          User        @relation("ReceivedEarnings", fields: [userId], references: [id])
+  fromUserId    Int?        // Member who activated package
+  fromUser      User?       @relation("GeneratedEarnings", fields: [fromUserId], references: [id])
+  
+  incomeType    IncomeType  // DIRECT_20, MATRIX_40, LEVEL_10, CAPITAL_GAIN_20, RANK_10, MAGICAL
+  amount        Decimal     @db.Decimal(18, 4)
+  level         Int?        // 1 to 10 (for LEVEL_10)
+  packageAmount Int?
+  txHash        String?
+  createdAt     DateTime    @default(now())
+
+  @@index([userId, incomeType])
+  @@index([createdAt])
+}
+
+// --------------------------------------------------------------------------
+// 7. Withdrawals & P2P Transfers (10% & 5% Deductions)
+// --------------------------------------------------------------------------
+model Transaction {
+  id                  Int       @id @default(autoincrement())
+  userId              Int
+  user                User      @relation(fields: [userId], references: [id])
+  type                TxType    // WITHDRAWAL, P2P_TRANSFER, etc.
+  grossAmount         Decimal   @db.Decimal(18, 4)
+  deductionRate       Decimal   @db.Decimal(5, 2) // 10.00% or 5.00%
+  deductionAmount     Decimal   @db.Decimal(18, 4)
+  netAmount           Decimal   @db.Decimal(18, 4)
+  recipientWalletOrId String?
+  txHash              String?
+  status              TxStatus  @default(COMPLETED)
+  createdAt           DateTime  @default(now())
+
+  @@index([userId, type])
+}

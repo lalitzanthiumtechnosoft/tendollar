@@ -1,0 +1,17 @@
+{
+  "name": "tendollar-contracts",
+  "version": "1.0.0",
+  "description": "tenDOLLAR BEP-20 Smart Contracts on Binance Smart Chain",
+  "main": "hardhat.config.cjs",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "deploy:bscTestnet": "npx hardhat run scripts/deploy.cjs --network bscTestnet",
+    "deploy:bscMainnet": "npx hardhat run scripts/deploy.cjs --network bscMainnet"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^16.4.7",
+    "hardhat": "^2.22.18"
+  }
+}
