@@ -82,6 +82,7 @@ export const HeroStats: React.FC<HeroStatsProps> = ({ user }) => {
               <span>{copiedLink ? 'Copied!' : 'Copy'}</span>
             </button>
           </div>
+        </div>
       </div>
 
       {/* 4 Essential KPI Cards */}
@@ -111,16 +112,16 @@ export const HeroStats: React.FC<HeroStatsProps> = ({ user }) => {
             <div className="kpi-icon-box blue-glow">
               <Award size={20} className="text-blue" />
             </div>
-            <span className="badge badge-cyan">Tier {user.unlockedTiers.length} Active</span>
+            <span className="badge badge-cyan">{user.unlockedTiers.length > 0 ? `Tier ${user.unlockedTiers.length} Active` : 'No Active Tier'}</span>
           </div>
           <div className="kpi-body">
             <span className="kpi-label">Highest Active Package</span>
             <div className="kpi-number font-mono text-primary">
-              ${user.activePackage} <span className="kpi-unit">BEP-20</span>
+              {user.activePackage > 0 ? `$${user.activePackage}` : '$0'} <span className="kpi-unit">BEP-20</span>
             </div>
           </div>
           <div className="kpi-footer text-xs text-muted">
-            Unlocked: {user.unlockedTiers.map(t => `$${t}`).join(', ')}
+            {user.unlockedTiers.length > 0 ? `Unlocked: ${user.unlockedTiers.map(t => `$${t}`).join(', ')}` : 'Entry Tier: $10 Ready'}
           </div>
         </div>
 
@@ -163,7 +164,7 @@ export const HeroStats: React.FC<HeroStatsProps> = ({ user }) => {
               ></div>
             </div>
             <div className="capping-detail font-mono text-xs text-muted">
-              ${user.cappingCurrent} of ${cappingLimit} USDT max
+              ${user.cappingCurrent.toFixed(2)} of ${cappingLimit.toFixed(2)} USDT max
             </div>
           </div>
           <div className="kpi-footer text-xs text-muted">

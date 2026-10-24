@@ -19,8 +19,8 @@ export const WithdrawalHub: React.FC<WithdrawalHubProps> = ({
   const [withdrawSuccess, setWithdrawSuccess] = useState<string | null>(null);
 
   // P2P Form State
-  const [p2pRecipient, setP2pRecipient] = useState<string>('10825');
-  const [p2pAmount, setP2pAmount] = useState<number>(10);
+  const [p2pRecipient, setP2pRecipient] = useState<string>('');
+  const [p2pAmount, setP2pAmount] = useState<number>(5);
   const [p2pSuccess, setP2pSuccess] = useState<string | null>(null);
 
   // Calculations based on PDF terms:

@@ -15,7 +15,7 @@ import {
 } from './data/mockData';
 import type { UserProfile, PackageTier, MatrixSlotState, DirectReferralItem, LevelIncomeItem } from './types';
 import { apiService } from './services/api';
-import { connectWeb3Wallet, switchToBscTestnet } from './utils/web3';
+import { connectWeb3Wallet, switchToBscTestnet, getConnectedAccount, getBnbBalance } from './utils/web3';
 import './App.css';
 
 export const App: React.FC = () => {
@@ -24,58 +24,77 @@ export const App: React.FC = () => {
   const [directs] = useState<DirectReferralItem[]>(INITIAL_DIRECTS);
   const [levels] = useState<LevelIncomeItem[]>(INITIAL_LEVELS);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
-  const [isConnected, setIsConnected] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  // Connect to Backend API & Verify BSC Testnet on load
+
+  // Connect to Backend API & Auto-detect MetaMask on load
   useEffect(() => {
     async function initConnection() {
-      const isHealthy = await apiService.checkHealth();
-      if (isHealthy) {
-        const info = await apiService.getProtocolInfo();
-        if (info) {
-          showToast(`⚡ Backend Connected: ${info.protocol.name} on BSC Testnet (5% Deposit Fee active).`);
-        }
+      await apiService.checkHealth();
+
+      const existingAccount = await getConnectedAccount();
+      if (existingAccount) {
+        setIsConnected(true);
+        const bnbBal = await getBnbBalance(existingAccount);
+        const profile = await apiService.getUserProfile(existingAccount);
+
+        setUser((prev) => ({
+          ...prev,
+          id: profile?.user?.id ? String(profile.user.id) : String(Math.floor(10002 + Math.random() * 50)),
+          walletAddress: existingAccount,
+          balanceBNB: bnbBal,
+          activePackage: profile?.user?.currentPackage || 0,
+          unlockedTiers: profile?.user?.unlockedTiers || [],
+          totalEarnings: profile?.user?.totalEarned || 0,
+          directEarnings: profile?.user?.directEarned || 0,
+          matrixEarnings: profile?.user?.matrixEarned || 0,
+          levelEarnings: profile?.user?.levelEarned || 0,
+          directReferralsCount: profile?.user?.directsCount || 0,
+          totalTeamCount: profile?.user?.teamSize || 0,
+          cappingCurrent: profile?.user?.cappingEarned || 0,
+        }));
       }
     }
     initConnection();
   }, []);
 
-  // Matrix Slot States for $10, $20, $40, $80
+  // Matrix Slot States for $10, $20, $40, $80 (Live Clean State)
   const [matrixStates] = useState<Record<number, MatrixSlotState>>({
     10: {
       packageAmount: 10,
-      cycleNumber: 4,
-      slot1Filled: true,
-      slot1User: '#10825',
+      cycleNumber: 1,
+      slot1Filled: false,
+      slot1User: undefined,
       slot2Filled: false,
-      totalRecycles: 3,
-      totalMatrixEarned: 24.00,
+      totalRecycles: 0,
+      totalMatrixEarned: 0.00,
     },
     20: {
       packageAmount: 20,
-      cycleNumber: 2,
-      slot1Filled: true,
-      slot1User: '#10834',
+      cycleNumber: 1,
+      slot1Filled: false,
+      slot1User: undefined,
       slot2Filled: false,
-      totalRecycles: 1,
-      totalMatrixEarned: 16.00,
+      totalRecycles: 0,
+      totalMatrixEarned: 0.00,
     },
     40: {
       packageAmount: 40,
-      cycleNumber: 2,
+      cycleNumber: 1,
       slot1Filled: false,
+      slot1User: undefined,
       slot2Filled: false,
-      totalRecycles: 1,
-      totalMatrixEarned: 32.00,
+      totalRecycles: 0,
+      totalMatrixEarned: 0.00,
     },
     80: {
       packageAmount: 80,
       cycleNumber: 1,
-      slot1Filled: true,
-      slot1User: '#10829',
+      slot1Filled: false,
+      slot1User: undefined,
       slot2Filled: false,
       totalRecycles: 0,
-      totalMatrixEarned: 32.00,
+      totalMatrixEarned: 0.00,
     },
   });
 
@@ -88,6 +107,7 @@ export const App: React.FC = () => {
   const handleConnectToggle = () => {
     if (isConnected) {
       setIsConnected(false);
+      setUser(INITIAL_USER);
       showToast('Wallet disconnected.');
     } else {
       setIsWalletModalOpen(true);
@@ -99,9 +119,23 @@ export const App: React.FC = () => {
     if (walletName === 'MetaMask' && (window as any).ethereum) {
       const realAccount = await connectWeb3Wallet();
       if (realAccount) {
+        const bnbBal = await getBnbBalance(realAccount);
+        const profile = await apiService.getUserProfile(realAccount);
+
         setUser((prev) => ({
           ...prev,
+          id: profile?.user?.id ? String(profile.user.id) : String(Math.floor(10002 + Math.random() * 50)),
           walletAddress: realAccount,
+          balanceBNB: bnbBal,
+          activePackage: profile?.user?.currentPackage || 0,
+          unlockedTiers: profile?.user?.unlockedTiers || [],
+          totalEarnings: profile?.user?.totalEarned || 0,
+          directEarnings: profile?.user?.directEarned || 0,
+          matrixEarnings: profile?.user?.matrixEarned || 0,
+          levelEarnings: profile?.user?.levelEarned || 0,
+          directReferralsCount: profile?.user?.directsCount || 0,
+          totalTeamCount: profile?.user?.teamSize || 0,
+          cappingCurrent: profile?.user?.cappingEarned || 0,
         }));
         setIsConnected(true);
         showToast(`MetaMask connected on BSC Testnet (Chain ID 97): ${realAccount.substring(0, 6)}...`);

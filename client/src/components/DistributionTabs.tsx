@@ -255,21 +255,33 @@ export const DistributionTabs: React.FC<DistributionTabsProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {directs.map((dir) => (
-                  <tr key={dir.id}>
-                    <td><span className="font-mono text-cyan">#{dir.id}</span></td>
-                    <td><span className="font-mono">{dir.walletAddress}</span></td>
-                    <td><span className="badge badge-cyan">${dir.packageAmount}</span></td>
-                    <td><span className="font-mono text-emerald font-bold">+${dir.earnedAmount}.00 USDT</span></td>
-                    <td className="text-muted text-xs">{dir.date}</td>
-                    <td>
-                      <a href="https://bscscan.com" target="_blank" rel="noreferrer" className="table-hash-link">
-                        <span className="font-mono">{dir.txHash}</span>
-                        <ExternalLink size={12} />
-                      </a>
+                {directs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '36px 16px', color: '#94a3b8' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                        <Users size={28} style={{ opacity: 0.4 }} />
+                        <span>No direct partners registered yet.</span>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>Connect your wallet & share your referral link to earn 20% instant direct income.</span>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  directs.map((dir) => (
+                    <tr key={dir.id}>
+                      <td><span className="font-mono text-cyan">#{dir.id}</span></td>
+                      <td><span className="font-mono">{dir.walletAddress}</span></td>
+                      <td><span className="badge badge-cyan">${dir.packageAmount}</span></td>
+                      <td><span className="font-mono text-emerald font-bold">+${dir.earnedAmount}.00 USDT</span></td>
+                      <td className="text-muted text-xs">{dir.date}</td>
+                      <td>
+                        <a href="https://bscscan.com" target="_blank" rel="noreferrer" className="table-hash-link">
+                          <span className="font-mono">{dir.txHash}</span>
+                          <ExternalLink size={12} />
+                        </a>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
